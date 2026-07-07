@@ -172,10 +172,11 @@ This analysis compares different pickup areas based on how much revenue they gen
 
 **Business value:**
 
-Shorter urban trips generate more revenue per distance travelled.
+This helps identify high-value locations where drivers can position themselves to earn more. For example, airports or busy commercial districts usually generate higher fares and better tips, making them more attractive for driver allocation strategies.
 
 **Finding:**
-Community Areas 62, 28, and 47 have the highest fare per mile, suggesting that shorter urban trips generate more revenue per distance travelled. This metric measures revenue efficiency rather than total earning potential, which also depends on trip volume.
+Higher-value pickup areas are generally associated with urban commercial zones and locations with airport connectivity. For example, Community Area 62 (West Elsdon) has the highest average fare per mile, benefits from Midway Airport-related trips while
+Community Area 28 (Near West Side) shows stronger earning potential.
 
 ---
 
