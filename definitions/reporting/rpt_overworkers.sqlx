@@ -12,7 +12,7 @@ WITH shift_stats AS (
     COUNTIF(s.shift_hours > 30)                           AS n_fleet_shifts,
     ROUND(SAFE_DIVIDE(COUNTIF(s.shift_hours > 30), COUNT(*)), 4)
                                                           AS pct_fleet_shifts,
-    COUNTIF(s.shift_hours BETWEEN 12 AND 30)              AS n_long_shifts
+    COUNTIF(s.shift_hours BETWEEN 12 AND 30)              AS n_long_shifts,
     ROUND(SAFE_DIVIDE(COUNTIF(s.shift_hours BETWEEN 12 AND 30), COUNT(*)), 4)
                                                           AS pct_long_shifts,
     ROUND(SUM(IF(s.shift_hours BETWEEN 12 AND 30, s.shift_hours, 0)), 1)
