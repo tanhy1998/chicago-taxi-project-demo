@@ -24,8 +24,7 @@ config {
 
   bigquery: {
     partitionBy:"DATE_TRUNC(trip_date, MONTH)",
-    clusterBy: ["taxi_id"],
-    updatePartitionFilter: "trip_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)"
+    clusterBy: ["taxi_id"]
   },
 
   uniqueKey: ["unique_key"],
