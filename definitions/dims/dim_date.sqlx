@@ -1,0 +1,64 @@
+config {
+  type: "table",
+  schema: "dims",
+  description: "Date dimension covering 2013-01-01 to 2026-12-31. US federal holidays are generated using SQL logic, with no external seed file required.",
+  assertions: {
+    uniqueKey: ["date_day"],
+    nonNull: ["date_day", "day_of_week", "is_us_federal_holiday"]
+  }
+}
+
+WITH calendar AS (
+  SELECT date_day
+  FROM UNNEST(GENERATE_DATE_ARRAY('2013-01-01', '2023-12-31')) AS date_day
+),
+
+base AS (
+  SELECT
+    date_day,
+    EXTRACT(YEAR  FROM date_day) AS yr,
+    EXTRACT(MONTH FROM date_day) AS mo,
+    EXTRACT(DAY   FROM date_day) AS dy,
+    -- BigQuery DAYOFWEEK: 1 = Sunday … 7 = Saturday
+    EXTRACT(DAYOFWEEK FROM date_day) AS dow,
+    -- nth occurrence of this weekday within the month (e.g. 3rd Monday)
+    CAST(CEIL(EXTRACT(DAY FROM date_day) / 7.0) AS INT64) AS nth_dow_of_month,
+    -- is this the LAST occurrence of this weekday in the month?
+    DATE_ADD(date_day, INTERVAL 7 DAY) >
+      LAST_DAY(date_day, MONTH) AS is_last_dow_of_month
+  FROM calendar
+),
+
+holidays AS (
+  SELECT
+    *,
+    CASE
+      WHEN mo = 1  AND dy = 1                                   THEN "New Year's Day"
+      WHEN mo = 1  AND dow = 2 AND nth_dow_of_month = 3         THEN "Martin Luther King Jr. Day"
+      WHEN mo = 2  AND dow = 2 AND nth_dow_of_month = 3         THEN "Presidents' Day"
+      WHEN mo = 5  AND dow = 2 AND is_last_dow_of_month         THEN "Memorial Day"
+      WHEN mo = 6  AND dy = 19 AND yr >= 2021                   THEN "Juneteenth"
+      WHEN mo = 7  AND dy = 4                                   THEN "Independence Day"
+      WHEN mo = 9  AND dow = 2 AND nth_dow_of_month = 1         THEN "Labor Day"
+      WHEN mo = 10 AND dow = 2 AND nth_dow_of_month = 2         THEN "Columbus Day"
+      WHEN mo = 11 AND dy = 11                                  THEN "Veterans Day"
+      WHEN mo = 11 AND dow = 5 AND nth_dow_of_month = 4         THEN "Thanksgiving Day"
+      WHEN mo = 12 AND dy = 25                                  THEN "Christmas Day"
+      ELSE NULL
+    END AS holiday_name
+  FROM base
+)
+
+SELECT
+  date_day,
+  yr                                        AS year,
+  mo                                        AS month,
+  FORMAT_DATE('%B', date_day)               AS month_name,
+  dy                                        AS day_of_month,
+  dow                                       AS day_of_week,
+  FORMAT_DATE('%A', date_day)               AS day_name,
+  dow IN (1, 7)                             AS is_weekend,
+  holiday_name,
+  holiday_name IS NOT NULL                  AS is_us_federal_holiday,
+  (mo = 12 AND dy = 31)                     AS is_new_years_eve
+FROM holidays

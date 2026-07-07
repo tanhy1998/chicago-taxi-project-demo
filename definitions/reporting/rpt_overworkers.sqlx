@@ -1,0 +1,37 @@
+config {
+  type: "table",
+  schema: "reporting",
+  dependOnDependencyAssertions: true,
+  description: "Q2: Top 100 overworkers based on total hours spent in long shifts. Shifts are defined in int_shifts as consecutive trips separated by at least 8 hours of rest. A shift is considered long if it lasts at least 12 hours. A taxi is considered to 'regularly' work long shifts if at least 25% of its shifts are long and it has at least 20 shifts in the analysis window. Ranked by total hours spent in long shifts over the whole datasets"
+}
+
+WITH shift_stats AS (
+  SELECT
+    s.taxi_id,
+    COUNT(*)                                              AS n_shifts,
+    COUNTIF(s.shift_hours > 30)                           AS n_fleet_shifts,
+    ROUND(SAFE_DIVIDE(COUNTIF(s.shift_hours > 30), COUNT(*)), 4)
+                                                          AS pct_fleet_shifts,
+    COUNTIF(s.shift_hours BETWEEN 12 AND 30)              AS n_long_shifts
+    ROUND(SAFE_DIVIDE(COUNTIF(s.shift_hours BETWEEN 12 AND 30), COUNT(*)), 4)
+                                                          AS pct_long_shifts,
+    ROUND(SUM(IF(s.shift_hours BETWEEN 12 AND 30, s.shift_hours, 0)), 1)
+                                                          AS hours_in_long_shifts,
+    ROUND(SUM(s.shift_hours), 1)                          AS total_hours_worked,
+    ROUND(MAX(s.shift_hours), 1)                          AS longest_shift_hours,
+    ROUND(AVG(s.shift_hours), 1)                          AS avg_shift_hours,
+    ROUND(SUM(s.shift_revenue), 2)                        AS total_revenue
+  FROM ${ref("int_shifts")} s
+  GROUP BY s.taxi_id
+)
+
+SELECT
+  *,
+  RANK() OVER (ORDER BY hours_in_long_shifts DESC, total_hours_worked DESC)
+    AS rank_by_overwork
+FROM shift_stats
+WHERE n_shifts >= 20
+  AND pct_long_shifts >= 0.25
+  AND pct_fleet_shifts < 0.05       
+QUALIFY rank_by_overwork <= 100
+ORDER BY rank_by_overwork

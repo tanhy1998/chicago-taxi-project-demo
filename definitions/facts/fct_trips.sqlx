@@ -1,0 +1,68 @@
+config {
+  type: "incremental",
+  schema: "facts",
+  description: "Gold fact table containing one row per valid taxi trip. Incremental loading keeps daily runs efficient, while partitioning and clustering improve reporting performance.",
+  columns: {
+    unique_key: "Unique trip identifier.",
+    taxi_id: "Anonymised taxi identifier.",
+    company: "Taxi company operating the trip.",
+    trip_start_ts: "Trip start timestamp.",
+    trip_end_ts: "Trip end timestamp.",
+    trip_date: "Trip date used for partitioning and reporting.",
+    trip_seconds: "Trip duration in seconds.",
+    trip_miles: "Trip distance in miles.",
+    pickup_community_area: "Community area where the trip started.",
+    dropoff_community_area: "Community area where the trip ended.",
+    fare: "Base fare charged for the trip.",
+    tips: "Recorded tip amount.",
+    tolls: "Toll charges.",
+    extras: "Additional charges.",
+    trip_total: "Total amount paid.",
+    payment_type: "Payment method used for the trip.",
+    tips_reliably_recorded: "TRUE when the payment method reliably records tips (cash tips are not captured)."
+  },
+
+  bigquery: {
+    partitionBy:"DATE_TRUNC(trip_date, MONTH)",
+    clusterBy: ["taxi_id"],
+    updatePartitionFilter: "trip_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)"
+  },
+
+  uniqueKey: ["unique_key"],
+
+  assertions: {
+    nonNull: ["unique_key", "taxi_id", "trip_start_ts", "trip_end_ts", "trip_date"],
+    rowConditions: [
+      "trip_end_ts >= trip_start_ts",
+      "fare IS NULL OR fare >= 0",
+      "tips IS NULL OR tips >= 0",
+      "trip_total IS NULL OR trip_total >= 0",
+      "trip_seconds IS NULL OR trip_seconds <= 86400"
+    ]
+  }
+}
+
+SELECT
+  s.unique_key,
+  s.taxi_id,
+  s.company  AS company,
+  s.trip_start_ts,
+  s.trip_end_ts,
+  s.trip_date,
+  s.trip_seconds,
+  s.trip_miles,
+  s.pickup_community_area,
+  s.dropoff_community_area,
+  s.fare,
+  s.tips,
+  s.tolls,
+  s.extras,
+  s.trip_total,
+  s.payment_type,
+  s.payment_type IN ('CREDIT CARD', 'MOBILE', 'PRCARD') AS tips_reliably_recorded
+FROM ${ref("stg_taxi_trips")} s
+WHERE s.is_valid_trip
+
+${when(incremental(),
+  `AND s.trip_start_ts > (SELECT COALESCE(MAX(trip_start_ts), TIMESTAMP('2013-01-01')) FROM ${self()})`
+)}

@@ -1,0 +1,14 @@
+config {
+  type: "table",
+  schema: "dims",
+  description: "Payment type dimension with a flag indicating whether tips are reliably recorded.",
+  assertions: {
+    uniqueKey: ["payment_type"]
+  }
+}
+
+SELECT DISTINCT
+  payment_type,
+  payment_type IN ('CREDIT CARD', 'MOBILE', 'PRCARD') AS tips_reliably_recorded
+FROM ${ref("stg_taxi_trips")}
+WHERE payment_type IS NOT NULL

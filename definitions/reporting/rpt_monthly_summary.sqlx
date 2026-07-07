@@ -1,0 +1,15 @@
+config {
+  type: "table",
+  schema: "reporting",
+  dependOnDependencyAssertions: true,
+  description: "Overview page: monthly trip volume, revenue and active taxis across full history."
+}
+
+SELECT
+  DATE_TRUNC(trip_date, MONTH)        AS month_start,
+  COUNT(*)                            AS n_trips,
+  ROUND(SUM(trip_total), 2)           AS total_revenue,
+  COUNT(DISTINCT taxi_id)             AS active_taxis,
+  ROUND(AVG(fare), 2)                 AS avg_fare
+FROM ${ref("fct_trips")}
+GROUP BY 1

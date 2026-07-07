@@ -1,0 +1,31 @@
+config {
+  type: "table",
+  schema: "reporting",
+  dependOnDependencyAssertions: true,
+  description: "Bonus insight 2: Revenue efficiency by pickup community area over the last 12 months. Measures fare per mile and tip rate to identify high-value pickup zones (e.g. airports like O'Hare and Midway). Helps guide driver positioning and supply allocation strategies."
+}
+
+WITH bounds AS (
+  SELECT DATE_SUB(MAX(trip_date), INTERVAL 12 MONTH) AS window_start
+  FROM ${ref("fct_trips")}
+)
+
+SELECT
+  f.pickup_community_area,
+  COUNT(*)                                              AS n_trips,
+  ROUND(SUM(f.trip_total), 2)                           AS total_revenue,
+  ROUND(AVG(f.trip_total), 2)                           AS avg_trip_total,
+  ROUND(SAFE_DIVIDE(SUM(f.fare), NULLIF(SUM(f.trip_miles), 0)), 2)
+                                                        AS fare_per_mile,
+  ROUND(SAFE_DIVIDE(
+    SUM(IF(f.tips_reliably_recorded, f.tips, 0)),
+    SUM(IF(f.tips_reliably_recorded, f.fare, 0))
+  ), 4)                                                 AS card_tip_rate,
+  ROUND(AVG(f.trip_miles), 2)                           AS avg_trip_miles
+FROM ${ref("fct_trips")} f
+CROSS JOIN bounds b
+WHERE f.trip_date > b.window_start
+  AND f.pickup_community_area IS NOT NULL
+  AND f.trip_miles > 0
+GROUP BY f.pickup_community_area
+HAVING COUNT(*) >= 100   

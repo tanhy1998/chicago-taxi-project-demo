@@ -1,0 +1,23 @@
+config {
+  type: "table",
+  schema: "reporting",
+  dependOnDependencyAssertions: true,
+  description: "Bonus insight 1: Demand heatmap by hour of day and day of week (last 12 months of data), including average fare per trip. Business value: helps align driver shifts and fleet supply with demand peaks, while revenue per trip highlights which peak periods are also the most profitable."
+}
+
+WITH bounds AS (
+  SELECT DATE_SUB(MAX(trip_date), INTERVAL 12 MONTH) AS window_start
+  FROM ${ref("fct_trips")}
+)
+
+SELECT
+  EXTRACT(DAYOFWEEK FROM f.trip_start_ts)  AS day_of_week,
+  FORMAT_TIMESTAMP('%A', f.trip_start_ts)  AS day_name,
+  EXTRACT(HOUR FROM f.trip_start_ts)       AS hour_of_day,
+  COUNT(*)                                 AS n_trips,
+  ROUND(AVG(f.trip_total), 2)              AS avg_trip_total,
+  ROUND(SUM(f.trip_total), 2)              AS total_revenue
+FROM ${ref("fct_trips")} f
+CROSS JOIN bounds b
+WHERE f.trip_date > b.window_start
+GROUP BY 1, 2, 3

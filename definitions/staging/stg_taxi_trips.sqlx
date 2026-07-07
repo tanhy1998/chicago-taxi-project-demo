@@ -1,0 +1,60 @@
+config {
+  type: "view",
+  schema: "staging",
+  description: "Silver layer. Cleans and standardises the raw taxi trips data by removing duplicates, applying data types, and adding quality checks. Built as a view because it is only read by the fact table during incremental loads.",
+  columns: {
+    unique_key: "Unique trip identifier from the source dataset",
+    taxi_id: "Anonymised taxi id identifier",
+    trip_start_ts: "Trip start timestamp",
+    trip_end_ts: "Trip end timestamp",
+    is_valid_trip: "Indicates whether the trip passes all data quality checks. Invalid rows are kept for auditing instead of being removed."
+  }
+}
+
+WITH deduped AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY unique_key
+      ORDER BY trip_start_timestamp DESC
+    ) AS rn
+  FROM ${ref("taxi_trips")}
+  WHERE trip_start_timestamp IS NOT NULL
+)
+
+SELECT
+  unique_key,
+  taxi_id,
+  trip_start_timestamp                          AS trip_start_ts,
+  trip_end_timestamp                            AS trip_end_ts,
+  DATE(trip_start_timestamp)                    AS trip_date,
+  trip_seconds,
+  trip_miles,
+  pickup_census_tract,
+  dropoff_census_tract,
+  pickup_community_area,
+  dropoff_community_area,
+  fare,
+  tips,
+  tolls,
+  extras,
+  trip_total,
+  UPPER(TRIM(payment_type))                     AS payment_type,
+  TRIM(company)                                 AS company,
+  pickup_latitude,
+  pickup_longitude,
+  dropoff_latitude,
+  dropoff_longitude,
+  (
+        taxi_id IS NOT NULL
+    AND trip_end_timestamp IS NOT NULL
+    AND trip_end_timestamp >= trip_start_timestamp
+    AND COALESCE(trip_seconds, 0) BETWEEN 0 AND 86400
+    AND COALESCE(trip_miles, 0)  BETWEEN 0 AND 500
+    AND COALESCE(fare, 0)        BETWEEN 0 AND 5000
+    AND COALESCE(tips, 0)        >= 0
+    AND COALESCE(trip_total, 0)  >= 0
+  ) AS is_valid_trip
+
+FROM deduped
+WHERE rn = 1

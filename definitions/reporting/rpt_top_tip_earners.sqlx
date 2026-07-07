@@ -1,0 +1,47 @@
+config {
+  type: "table",
+  schema: "reporting",
+  dependOnDependencyAssertions: true,
+  description: "Q1: Top 100 taxi IDs ranked by total recorded tips over the last 3 months of data. The time window is anchored to MAX(trip_date) instead of CURRENT_DATE because the dataset is historical. Note: cash tips are not recorded, so this metric reflects only electronic tips. A card-only tip rate is included for fair comparison.",
+  assertions: {
+    uniqueKey: ["taxi_id"],
+    rowConditions: [
+      "total_tips >= 0",
+      "rank_by_tips BETWEEN 1 AND 100"
+    ]
+  }
+}
+
+WITH bounds AS (
+  SELECT
+    DATE_SUB(MAX(trip_date), INTERVAL 3 MONTH) AS window_start,
+    MAX(trip_date) AS window_end
+  FROM ${ref("fct_trips")}
+),
+
+tips_by_taxi AS (
+  SELECT
+    f.taxi_id,
+    MIN(b.window_start)                                     AS window_start,
+    MIN(b.window_end)                                       AS window_end,
+    COUNT(*)                                                AS n_trips,
+    COUNTIF(f.tips_reliably_recorded)                       AS n_card_trips,
+    ROUND(SUM(f.tips), 2)                                   AS total_tips,
+    ROUND(SUM(f.trip_total), 2)                             AS total_revenue,
+    ROUND(SAFE_DIVIDE(
+      SUM(IF(f.tips_reliably_recorded, f.tips, 0)),
+      SUM(IF(f.tips_reliably_recorded, f.fare, 0))
+    ), 4)                                                   AS card_tip_rate
+  FROM ${ref("fct_trips")} f
+  CROSS JOIN bounds b
+  WHERE f.trip_date > b.window_start
+    AND f.trip_date <= b.window_end
+  GROUP BY f.taxi_id
+)
+
+SELECT
+  *,
+  RANK() OVER (ORDER BY total_tips DESC) AS rank_by_tips
+FROM tips_by_taxi
+QUALIFY rank_by_tips <= 100
+ORDER BY rank_by_tips

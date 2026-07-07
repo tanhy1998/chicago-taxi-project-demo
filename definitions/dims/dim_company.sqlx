@@ -1,0 +1,17 @@
+config {
+  type: "table",
+  schema: "dims",
+  description: "Distinct and thin dim taxi companies to demonstrate the star schema pattern and give Looker Data Studio a clean slicer.",
+   assertions: {
+     uniqueKey: ["company"]
+   }
+}
+
+SELECT
+  company                            AS company_name,
+  COUNT(DISTINCT taxi_id)            AS n_taxis_ever_seen,
+  MIN(trip_date)                     AS first_trip_date,
+  MAX(trip_date)                     AS last_trip_date
+FROM ${ref("stg_taxi_trips")}
+WHERE company IS NOT NULL
+GROUP BY company

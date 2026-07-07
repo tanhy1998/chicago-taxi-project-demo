@@ -1,0 +1,51 @@
+config {
+  type: "table",
+  schema: "reporting",
+  dependOnDependencyAssertions: true,
+  description: "Q3: Impact of US federal holidays on taxi trip volume. Each holiday is compared against a baseline defined as the average trip count of the same weekday within ±4 weeks of the event. This controls for both weekday patterns and seasonal trends. pct_vs_baseline shows whether demand increased or decreased compared to normal conditions. One row per holiday occurrence.",
+  assertions: {
+    nonNull: ["holiday_name", "date_day", "n_trips", "baseline_trips"],
+    uniqueKey: ["date_day"]
+  }
+}
+
+WITH daily AS (
+  SELECT trip_date, COUNT(*) AS n_trips
+  FROM ${ref("fct_trips")}
+  GROUP BY trip_date
+),
+
+with_calendar AS (
+  SELECT
+    d.date_day, d.day_of_week, d.day_name,
+    d.holiday_name, d.is_us_federal_holiday,
+    COALESCE(dl.n_trips, 0) AS n_trips
+  FROM ${ref("dim_date")} d
+  LEFT JOIN daily dl ON dl.trip_date = d.date_day
+  WHERE d.date_day BETWEEN (SELECT MIN(trip_date) FROM daily)
+                       AND (SELECT MAX(trip_date) FROM daily)
+),
+
+with_baseline AS (
+  SELECT
+    *,
+    AVG(IF(is_us_federal_holiday, NULL, n_trips)) OVER (
+      PARTITION BY day_of_week
+      ORDER BY date_day
+      ROWS BETWEEN 4 PRECEDING AND 4 FOLLOWING
+    ) AS baseline_trips
+  FROM with_calendar
+)
+
+SELECT
+  date_day,
+  EXTRACT(YEAR FROM date_day) AS year,
+  holiday_name,
+  day_name,
+  n_trips,
+  ROUND(baseline_trips, 0)    AS baseline_trips,
+  ROUND(SAFE_DIVIDE(n_trips - baseline_trips, baseline_trips), 4) AS pct_vs_baseline
+FROM with_baseline
+WHERE is_us_federal_holiday
+  AND baseline_trips IS NOT NULL
+ORDER BY date_day

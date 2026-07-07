@@ -1,0 +1,71 @@
+config {
+  type: "table",
+  schema: "intermediate",
+  dependOnDependencyAssertions: true,
+  description: "Q2 shift-building model. Groups trips into continuous working shifts per taxi using time gaps between trips. A new shift starts when the rest gap between trips is at least 8 hours. Each row represents one shift per taxi, with shift duration measured from first pickup to last dropoff.",
+  bigquery: {
+    partitionBy: "DATE_TRUNC(shift_start_ts, MONTH)",
+    clusterBy: ["taxi_id"]
+  },
+  assertions: {
+    uniqueKey: ["taxi_id", "shift_seq"],
+    rowConditions: [
+      "shift_end_ts >= shift_start_ts",
+      "n_trips >= 1"
+    ]
+  }
+}
+
+WITH ordered_trips AS (
+  SELECT
+    taxi_id,
+    trip_start_ts,
+    trip_end_ts,
+    trip_total,
+    tips,
+    trip_miles,
+    LAG(trip_end_ts) OVER (
+      PARTITION BY taxi_id
+      ORDER BY trip_start_ts, trip_end_ts
+    ) AS prev_trip_end_ts
+  FROM ${ref("fct_trips")}
+),
+
+flagged AS (
+  SELECT
+    *,
+    CASE
+      WHEN prev_trip_end_ts IS NULL THEN 1
+      WHEN TIMESTAMP_DIFF(trip_start_ts, prev_trip_end_ts, MINUTE)
+           >= 8 * 60 THEN 1
+      ELSE 0
+    END AS is_new_shift
+  FROM ordered_trips
+),
+
+sessionised AS (
+  SELECT
+    *,
+    SUM(is_new_shift) OVER (
+      PARTITION BY taxi_id
+      ORDER BY trip_start_ts, trip_end_ts
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS shift_seq
+  FROM flagged
+)
+
+SELECT
+  taxi_id,
+  shift_seq,
+  MIN(trip_start_ts)                                            AS shift_start_ts,
+  MAX(trip_end_ts)                                              AS shift_end_ts,
+  TIMESTAMP_DIFF(MAX(trip_end_ts), MIN(trip_start_ts), MINUTE) / 60.0
+                                                                AS shift_hours,
+  COUNT(*)                                                      AS n_trips,
+  SUM(trip_total)                                               AS shift_revenue,
+  SUM(tips)                                                     AS shift_tips,
+  SUM(trip_miles)                                               AS shift_miles,
+  TIMESTAMP_DIFF(MAX(trip_end_ts), MIN(trip_start_ts), MINUTE) / 60.0
+    >= 12        AS is_long_shift
+FROM sessionised
+GROUP BY taxi_id, shift_seq

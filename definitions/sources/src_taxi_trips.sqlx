@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "bigquery-public-data",
+  schema: "chicago_taxi_trips",
+  name: "taxi_trips",
+  description: "Bronze layer. Declaration only to avoid copy the ~75GB raw table. Chicago taxi trips reported to the City of Chicago, 2013-2023."
+}
