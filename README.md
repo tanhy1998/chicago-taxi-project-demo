@@ -42,7 +42,7 @@ Medallion architure layering with different types of SQL materialisations in dat
 
 **Assumptions**
 
-- The calculation ==window== was based on the `MAX(trip_date) with interval of 3 months`.
+- The calculation window was based on the `MAX(trip_date) with interval of 3 months`.
 - A secondary metric, `card_tip_rate` (tips ÷ fares over card trips only), is provided as a like-for-like comparison.
 
 **Finding.** `Top-100 taxis ID earned $400k in recorded tips for the time range window of 1st Oct - 31st Dec of 2023`
@@ -66,7 +66,7 @@ Few defined rules:
 | Shift          | Trips where the gap between one drop-off and next pick-up is**less than 8 hours** | 8 hours is treated as a normal rest/sleep break                    |
 | Shift duration | Time from first trip start to last trip end in a shift                                  | Shows total working time                                           |
 | Long shift     | A shift between**12 to 30 hours**                                                 | 12+ hours means long work but 30+ hours is abnormal (special case) |
-| "Regularly"    | At least**25% of shifts are long** with at least **20 shifts total**      | Avoids small sample bias                                           |
+| "Regularly"    | At least**25% of shifts are long**, at least **20 shifts total** , fleet shift less than **25**    | Avoids small sample bias                                           |
 | Ranking        | Total hours spent in long shifts                                                        | Focus on total workload, not just count                            |
 
 **Method:**
@@ -105,11 +105,11 @@ To avoid data noise:
 * the rules (8h / 12h / 30h) are assumptions, but results are stable
 * we cannot see if the driver actually rested inside the vehicle activity window
 
-**Finding:** `<fill after run: e.g. "N taxis meet the 'regularly long' definition; the top-ranked accumulated X hours in long shifts over 3 months, longest single-driver shift Y h.">`
+**Finding:** `About 1.9 millions trips hour in long shifts for the top 100, longest single-driver shift 977 h.(This is the one make me have more thoughts)"
 
 ---
 
-## Q3 — Do public holidays significantly affect trips?
+## Q3 Do public holidays significantly affect trips?
 
 **Question understanding:**
 This question compares taxi trip counts on US federal holidays against normal days, to see whether holidays cause trips to increase or decrease.
