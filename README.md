@@ -66,7 +66,7 @@ Few defined rules:
 | Shift          | Trips where the gap between one drop-off and next pick-up is**less than 8 hours** | 8 hours is treated as a normal rest/sleep break                    |
 | Shift duration | Time from first trip start to last trip end in a shift                                  | Shows total working time                                           |
 | Long shift     | A shift between**12 to 30 hours**                                                 | 12+ hours means long work but 30+ hours is abnormal (special case) |
-| "Regularly"    | At least**25% of shifts are long**, at least **20 shifts total** , fleet shift less than **25**    | Avoids small sample bias                                           |
+| "Regularly"    | At least**25% of shifts are long**, at least **20 shifts total** , fleet shift less than **5%**    | Avoids small sample bias                                           |
 | Ranking        | Total hours spent in long shifts                                                        | Focus on total workload, not just count                            |
 
 **Method:**
